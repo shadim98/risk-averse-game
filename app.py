@@ -2,7 +2,7 @@ import streamlit as st
 import random
 
 st.set_page_config(page_title="Risk Averse Game", page_icon="🎲")
-st.title("🎲 Risk Averse Game: Stage-by-Stage Choices")
+st.title("🎲 Risk Averse Game")
 
 # -----------------------------
 # Initialize session state
@@ -10,95 +10,87 @@ st.title("🎲 Risk Averse Game: Stage-by-Stage Choices")
 if "stage" not in st.session_state:
     st.session_state.stage = 1
     st.session_state.user_choices = []
+    st.session_state.stage_results = []
+    st.session_state.punishment_applied = False
     st.session_state.A_values = [10, 10, 9]
-    st.session_state.B_values = [0, 0, 20]  # For Risk Option
-    st.session_state.B_alt_values = [19, 19, 19]  # Risk high value
-    st.session_state.P = [0.95, 0.95, 0.85]  # Probabilities for Option A
-    st.session_state.P_risk = [0.5, 0.5, 0.5]  # Probabilities for Option B
-    st.session_state.punishment = 0.33
+    st.session_state.B_values = [0, 0, 20]
+    st.session_state.B_alt_values = [19, 19, 19]
+    st.session_state.P = [0.95, 0.95, 0.85]
+    st.session_state.P_risk = [0.5, 0.5, 0.5]
     st.session_state.dice = random.randint(1, 6)
     st.session_state.user_dice = None
-    st.session_state.punishment_applied = False
-    st.session_state.stage_results = []
+
+PUNISHMENT = 0.33
 
 # -----------------------------
-# Restart callback
+# Restart Game
 # -----------------------------
 def restart_game():
-    keys = ["stage", "user_choices","A_values","B_values","stage_results",
-            "dice","user_dice","punishment_applied"]
+    keys = ["stage","user_choices","stage_results","punishment_applied","dice","user_dice"]
     for k in keys:
         st.session_state.pop(k, None)
 
 # -----------------------------
-# Stage-by-stage choices
+# Callback Functions
+# -----------------------------
+def choose_option(option):
+    st.session_state.user_choices.append(option)
+    idx = st.session_state.stage - 1
+    if option == "A":
+        expected = st.session_state.P[idx]*st.session_state.A_values[idx] + (1-st.session_state.P[idx])*(st.session_state.A_values[idx]-1)
+    else:
+        expected = st.session_state.P_risk[idx]*st.session_state.B_values[idx] + (1-st.session_state.P_risk[idx])*st.session_state.B_alt_values[idx]
+    st.session_state.stage_results.append(expected)
+    st.session_state.stage += 1
+
+def submit_dice():
+    st.session_state.user_dice = st.session_state.dice_input
+    if st.session_state.user_dice != st.session_state.dice and st.session_state.user_dice >= 5:
+        st.session_state.punishment_applied = True
+    st.session_state.stage += 1
+
+# -----------------------------
+# Dice ASCII
+# -----------------------------
+dice_art = {
+    1: "-----\n|   |\n| o |\n|   |\n-----",
+    2: "-----\n|o  |\n|   |\n|  o|\n-----",
+    3: "-----\n|o  |\n| o |\n|  o|\n-----",
+    4: "-----\n|o o|\n|   |\n|o o|\n-----",
+    5: "-----\n|o o|\n| o |\n|o o|\n-----",
+    6: "-----\n|o o|\n|o o|\n|o o|\n-----",
+}
+
+# -----------------------------
+# Stage Logic
 # -----------------------------
 stage = st.session_state.stage
 
+# Stage 1-3: choose options
 if stage <= 3:
+    idx = stage - 1
     st.subheader(f"--- Stage {stage} ---")
-
-    # Show Option A probabilities
-    A_prob_text = f"Option A (Safe Zone): {st.session_state.P[stage-1]*100:.0f}% of {st.session_state.A_values[stage-1]} OR {(1-st.session_state.P[stage-1])*100:.0f}% of {st.session_state.A_values[stage-1]-1}"
-    st.write(A_prob_text)
-
-    # Show Option B probabilities
-    B_prob_text = f"Option B (Risk Zone): {st.session_state.P_risk[stage-1]*100:.0f}% of {st.session_state.B_values[stage-1]} OR {(1-st.session_state.P_risk[stage-1])*100:.0f}% of {st.session_state.B_alt_values[stage-1]}"
-    st.write(B_prob_text)
-
-    # Player chooses Option A or B
+    st.write(f"Option A (Safe Zone): {st.session_state.P[idx]*100:.0f}% of {st.session_state.A_values[idx]} OR {(1-st.session_state.P[idx])*100:.0f}% of {st.session_state.A_values[idx]-1}")
+    st.write(f"Option B (Risk Zone): {st.session_state.P_risk[idx]*100:.0f}% of {st.session_state.B_values[idx]} OR {(1-st.session_state.P_risk[idx])*100:.0f}% of {st.session_state.B_alt_values[idx]}")
     col1, col2 = st.columns(2)
-    if col1.button("Choose Option A"):
-        st.session_state.user_choices.append("A")
-        # Compute expected value for stage and store
-        expected = st.session_state.P[stage-1]*st.session_state.A_values[stage-1] + (1-st.session_state.P[stage-1])*(st.session_state.A_values[stage-1]-1)
-        st.session_state.stage_results.append(expected)
-        st.session_state.stage += 1
+    col1.button("Choose Option A", on_click=choose_option, args=("A",))
+    col2.button("Choose Option B", on_click=choose_option, args=("B",))
 
-    if col2.button("Choose Option B"):
-        st.session_state.user_choices.append("B")
-        # Compute expected value for stage and store
-        expected = st.session_state.P_risk[stage-1]*st.session_state.B_values[stage-1] + (1-st.session_state.P_risk[stage-1])*st.session_state.B_alt_values[stage-1]
-        st.session_state.stage_results.append(expected)
-        st.session_state.stage += 1
-
-# -----------------------------
-# Dice Roll / Truth or Lie
-# -----------------------------
+# Stage 4: Dice roll input
 elif stage == 4:
     st.subheader("🎲 Dice Roll Stage")
-    st.write("The dice has been rolled!")
-    dice_art = {
-        1: "-----\n|   |\n| o |\n|   |\n-----",
-        2: "-----\n|o  |\n|   |\n|  o|\n-----",
-        3: "-----\n|o  |\n| o |\n|  o|\n-----",
-        4: "-----\n|o o|\n|   |\n|o o|\n-----",
-        5: "-----\n|o o|\n| o |\n|o o|\n-----",
-        6: "-----\n|o o|\n|o o|\n|o o|\n-----",
-    }
     st.text(dice_art[st.session_state.dice])
-    st.session_state.user_dice = st.number_input("Declare the dice number (1-6, you may lie):", min_value=1, max_value=6, value=1)
-    if st.button("Submit Dice"):
-        if st.session_state.user_dice == st.session_state.dice:
-            st.success("✅ You told the truth. SAFE.")
-        else:
-            st.warning("⚠️ You lied!")
-            if st.session_state.user_dice >= 5:
-                st.session_state.punishment_applied = True
-                st.error("Lie with punishment! (+0.33 to all stages)")
-        st.session_state.stage += 1
+    st.session_state.dice_input = st.number_input("Enter dice number (1-6, may lie):", min_value=1, max_value=6, value=1)
+    st.button("Submit Dice", on_click=submit_dice)
 
-# -----------------------------
-# Show Final Results
-# -----------------------------
+# Stage 5: Final results
 elif stage == 5:
-    # Apply punishment if needed
     if st.session_state.punishment_applied:
-        st.session_state.stage_results = [x + st.session_state.punishment for x in st.session_state.stage_results]
+        st.session_state.stage_results = [x + PUNISHMENT for x in st.session_state.stage_results]
 
-    st.subheader("📊 Stage Results")
+    st.subheader("📊 Stage Results (your choices)")
     for i, val in enumerate(st.session_state.stage_results,1):
-        st.write(f"Stage {i} - Expected Value of your choice: {val:.2f} (Option {st.session_state.user_choices[i-1]})")
+        st.write(f"Stage {i} - Expected Value: {val:.2f} (Option {st.session_state.user_choices[i-1]})")
 
     st.success("✅ Game Finished. Thank you for playing!")
     st.button("🔄 Restart Game", on_click=restart_game)
