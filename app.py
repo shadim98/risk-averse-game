@@ -2,7 +2,7 @@ import streamlit as st
 import random
 
 st.set_page_config(page_title="Risk Averse Game", page_icon="🎲")
-st.title("🎲 Risk Averse Game: Stage-by-Stage Choices")
+st.title("🎲 Risk Averse Game")
 
 # -----------------------------
 # Initialize session state
@@ -101,13 +101,27 @@ elif stage == 5:
         st.session_state.stage_results = [x + PUNISHMENT for x in st.session_state.stage_results]
 
     # Show truth/lie
+    st.subheader("🎯 Dice Result")
     st.write(st.session_state.truth_message)
     if st.session_state.punishment_message:
         st.warning(st.session_state.punishment_message)
 
-    st.subheader("📊 Stage Results (your choices after punishment if any)")
-    for i, val in enumerate(st.session_state.stage_results,1):
-        st.write(f"Stage {i} - Expected Value: {val:.2f} (Option {st.session_state.user_choices[i-1]})")
+    # Show final stage results with better option
+    st.subheader("📊 Stage Results with Better Option")
+    for i in range(3):
+        a_val = st.session_state.P[i]*st.session_state.A_values[i] + (1-st.session_state.P[i])*(st.session_state.A_values[i]-1)
+        b_val = st.session_state.P_risk[i]*st.session_state.B_values[i] + (1-st.session_state.P_risk[i])*st.session_state.B_alt_values[i]
+        if st.session_state.punishment_applied:
+            a_val += PUNISHMENT
+            b_val += PUNISHMENT
+        user_val = st.session_state.stage_results[i]
+        if a_val > b_val:
+            better = "Option A"
+        elif b_val > a_val:
+            better = "Option B"
+        else:
+            better = "Draw"
+        st.write(f"Stage {i+1}: Your Choice: {st.session_state.user_choices[i]} ({user_val:.2f}) | Better Option: {better} (A={a_val:.2f}, B={b_val:.2f})")
 
     st.success("✅ Game Finished. Thank you for playing!")
     st.button("🔄 Restart Game", on_click=restart_game)
