@@ -3,11 +3,9 @@ import random
 
 st.set_page_config(page_title="Risk Averse Game", page_icon="🎲")
 st.title("🎲 Risk Averse Game: Risk vs Safe Choices")
-st.write("Make choices across 3 stages and declare a dice roll (truth or lie).")
+st.write("At each stage, choose Option A (Safe) or Option B (Risk) based on the numbers shown.")
 
-# -----------------------------
 # Initialize session state
-# -----------------------------
 if "stage" not in st.session_state:
     st.session_state.stage = 1
     st.session_state.user_choices = []
@@ -29,18 +27,17 @@ dice_art = {
     6: "-----\n|o o|\n|o o|\n|o o|\n-----",
 }
 
-# -----------------------------
-# Callback Functions
-# -----------------------------
+# Callback for choosing options
 def choose_option(option):
     st.session_state.user_choices.append(option)
     st.session_state.stage += 1
 
+# Callback for dice submission
 def submit_dice():
     st.session_state.user_dice = st.session_state.dice_input
-    # Truth or Lie Check
     if st.session_state.user_dice == st.session_state.dice:
         st.session_state.truth_message = "✅ You told the truth. SAFE."
+        st.session_state.punishment_message = ""
     else:
         st.session_state.truth_message = "⚠️ You lied!"
         if st.session_state.user_dice >= 5:
@@ -50,43 +47,42 @@ def submit_dice():
             st.session_state.punishment_message = "Lie without punishment."
     st.session_state.stage += 1
 
+# Restart callback
 def restart_game():
     for key in ["stage","user_choices","A_values","B_values","punishment_applied","dice","user_dice"]:
         st.session_state.pop(key, None)
 
 # -----------------------------
-# Game Stages
+# Stage 1-3: Show numbers and let player choose
 # -----------------------------
-# Stage 1-3: Option A or B
 if st.session_state.stage in [1,2,3]:
+    idx = st.session_state.stage - 1
     st.subheader(f"--- Stage {st.session_state.stage} ---")
-    st.write("Choose an option:")
+    st.write(f"Option A (Safe): {st.session_state.A_values[idx]:.2f}")
+    st.write(f"Option B (Risk): {st.session_state.B_values[idx]:.2f}")
+    st.write("Choose your option:")
     col1, col2 = st.columns(2)
-    col1.button("Option A (Safe Zone)", on_click=choose_option, args=("A",))
-    col2.button("Option B (Risk Zone)", on_click=choose_option, args=("B",))
+    col1.button("Option A", on_click=choose_option, args=("A",))
+    col2.button("Option B", on_click=choose_option, args=("B",))
 
-# Stage 4: Dice input
+# Stage 4: Dice roll
 elif st.session_state.stage == 4:
     st.subheader("🎲 Dice Roll Stage")
-    st.write(f"The dice has been rolled!")
+    st.write("The dice has been rolled!")
     st.text(dice_art[st.session_state.dice])
     st.session_state.dice_input = st.number_input("Enter the dice number you want to declare (1-6, you may lie)", min_value=1, max_value=6, value=1)
     st.button("Submit Dice", on_click=submit_dice)
 
-# Stage 5: Apply Punishment and Show Results
+# Stage 5: Apply punishment and show final results
 elif st.session_state.stage == 5:
-    # Apply punishment
     if st.session_state.punishment_applied:
         for i in range(3):
             st.session_state.A_values[i] += PUNISHMENT
             st.session_state.B_values[i] += PUNISHMENT
 
-    # Show Truth/Lie messages
     st.write(st.session_state.truth_message)
-    if st.session_state.punishment_applied:
+    if st.session_state.punishment_message:
         st.warning(st.session_state.punishment_message)
-    else:
-        st.info(st.session_state.punishment_message if "punishment_message" in st.session_state else "")
 
     # Show final values
     st.subheader("📊 Final Values")
