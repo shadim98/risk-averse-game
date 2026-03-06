@@ -2,7 +2,7 @@ import streamlit as st
 import random
 
 st.set_page_config(page_title="Risk Averse Game", page_icon="🎲")
-st.title("🎲 Risk Averse Game")
+st.title("🎲 Risk Averse Game: Stage-by-Stage Choices")
 
 # -----------------------------
 # Initialize session state
@@ -11,14 +11,16 @@ if "stage" not in st.session_state:
     st.session_state.stage = 1
     st.session_state.user_choices = []
     st.session_state.stage_results = []
-    st.session_state.punishment_applied = False
     st.session_state.A_values = [10, 10, 9]
     st.session_state.B_values = [0, 0, 20]
     st.session_state.B_alt_values = [19, 19, 19]
     st.session_state.P = [0.95, 0.95, 0.85]
     st.session_state.P_risk = [0.5, 0.5, 0.5]
+    st.session_state.punishment_applied = False
     st.session_state.dice = random.randint(1, 6)
     st.session_state.user_dice = None
+    st.session_state.truth_message = ""
+    st.session_state.punishment_message = ""
 
 PUNISHMENT = 0.33
 
@@ -26,7 +28,8 @@ PUNISHMENT = 0.33
 # Restart Game
 # -----------------------------
 def restart_game():
-    keys = ["stage","user_choices","stage_results","punishment_applied","dice","user_dice"]
+    keys = ["stage","user_choices","stage_results","A_values","B_values",
+            "punishment_applied","dice","user_dice","truth_message","punishment_message"]
     for k in keys:
         st.session_state.pop(k, None)
 
@@ -34,19 +37,27 @@ def restart_game():
 # Callback Functions
 # -----------------------------
 def choose_option(option):
-    st.session_state.user_choices.append(option)
     idx = st.session_state.stage - 1
     if option == "A":
         expected = st.session_state.P[idx]*st.session_state.A_values[idx] + (1-st.session_state.P[idx])*(st.session_state.A_values[idx]-1)
     else:
         expected = st.session_state.P_risk[idx]*st.session_state.B_values[idx] + (1-st.session_state.P_risk[idx])*st.session_state.B_alt_values[idx]
     st.session_state.stage_results.append(expected)
+    st.session_state.user_choices.append(option)
     st.session_state.stage += 1
 
 def submit_dice():
     st.session_state.user_dice = st.session_state.dice_input
-    if st.session_state.user_dice != st.session_state.dice and st.session_state.user_dice >= 5:
-        st.session_state.punishment_applied = True
+    if st.session_state.user_dice == st.session_state.dice:
+        st.session_state.truth_message = "✅ You told the truth. SAFE."
+        st.session_state.punishment_message = ""
+    else:
+        st.session_state.truth_message = "⚠️ You lied!"
+        if st.session_state.user_dice >= 5:
+            st.session_state.punishment_applied = True
+            st.session_state.punishment_message = f"Lie with punishment! (+{PUNISHMENT} to all stages)"
+        else:
+            st.session_state.punishment_message = "Lie without punishment."
     st.session_state.stage += 1
 
 # -----------------------------
@@ -80,15 +91,21 @@ if stage <= 3:
 elif stage == 4:
     st.subheader("🎲 Dice Roll Stage")
     st.text(dice_art[st.session_state.dice])
-    st.session_state.dice_input = st.number_input("Enter dice number (1-6, may lie):", min_value=1, max_value=6, value=1)
+    st.session_state.dice_input = st.number_input("Enter dice number (1-6, you may lie):", min_value=1, max_value=6, value=1)
     st.button("Submit Dice", on_click=submit_dice)
 
 # Stage 5: Final results
 elif stage == 5:
+    # Apply punishment if player lied with >=5
     if st.session_state.punishment_applied:
         st.session_state.stage_results = [x + PUNISHMENT for x in st.session_state.stage_results]
 
-    st.subheader("📊 Stage Results (your choices)")
+    # Show truth/lie
+    st.write(st.session_state.truth_message)
+    if st.session_state.punishment_message:
+        st.warning(st.session_state.punishment_message)
+
+    st.subheader("📊 Stage Results (your choices after punishment if any)")
     for i, val in enumerate(st.session_state.stage_results,1):
         st.write(f"Stage {i} - Expected Value: {val:.2f} (Option {st.session_state.user_choices[i-1]})")
 
