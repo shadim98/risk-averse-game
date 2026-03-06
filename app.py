@@ -1,199 +1,113 @@
+import streamlit as st
 import random
 
-print("===================================")
-print("      Welcome to Risk Averse Game")
-print("===================================\n")
+st.set_page_config(page_title="Risk Averse Game", page_icon="🎲")
+st.title("🎲 Risk Averse Game: Risk vs Safe Choices")
+st.write("Make choices across 3 stages and declare a dice roll (truth or lie).")
 
+# -----------------------------
+# Initialize session state
+# -----------------------------
+if "stage" not in st.session_state:
+    st.session_state.stage = 1
+    st.session_state.user_choices = []
+    st.session_state.A_values = [10, 10, 9]
+    st.session_state.B_values = [9.5, 9.5, 9.5]
+    st.session_state.punishment_applied = False
+    st.session_state.dice = random.randint(1, 6)
+    st.session_state.user_dice = None
 
-# -----------------------------------
-# Stage Values (Expected Values)
-# -----------------------------------
-
-A_values = [10, 10, 9]  # Option A
-B_values = [9.5, 9.5, 9.5]  # Option B
 PUNISHMENT = 0.33
 
-
-# -----------------------------------
-# Show Rules
-# -----------------------------------
-
-print("Game Rules:\n")
-
-print("Option A (Safe Zone):")
-print(" Stage 1: 95% of 10 OR 5% of 9")
-print(" Stage 2: 95% of 10 OR 5% of 9")
-print(" Stage 3: 85% of 10 OR 15% of 9\n")
-
-print("Option B (Risk Zone):")
-print(" Stage 1: 50% of 0 OR 50% of 19")
-print(" Stage 2: 50% of 0 OR 50% of 19")
-print(" Stage 3: 50% of 20 OR 50% of 19\n")
-
-
-# -----------------------------------
-# User Choice in Each Stage
-# -----------------------------------
-
-user_choices = []
-
-for stage in range(3):
-    print(f"--- Stage {stage + 1} ---")
-    print("Choose Option A or B")
-    choice = input("Enter A or B: ").upper()
-    while choice not in ["A", "B"]:
-        print("Invalid choice! Please enter A or B.")
-        choice = input("Enter A or B: ").upper()
-    user_choices.append(choice)
-    print()
-
-
-# -----------------------------------
-# Roll Dice
-# -----------------------------------
-
-dice = random.randint(1, 6)
-
-print("\nDice Rolled:")
-
+# Dice ASCII art
 dice_art = {
-    1: """
-    -----
-    |   |
-    | o |
-    |   |
-    -----
-    """,
-    2: """
-    -----
-    |o  |
-    |   |
-    |  o|
-    -----
-    """,
-    3: """
-    -----
-    |o  |
-    | o |
-    |  o|
-    -----
-    """,
-    4: """
-    -----
-    |o o|
-    |   |
-    |o o|
-    -----
-    """,
-    5: """
-    -----
-    |o o|
-    | o |
-    |o o|
-    -----
-    """,
-    6: """
-    -----
-    |o o|
-    |o o|
-    |o o|
-    -----
-    """
+    1: "-----\n|   |\n| o |\n|   |\n-----",
+    2: "-----\n|o  |\n|   |\n|  o|\n-----",
+    3: "-----\n|o  |\n| o |\n|  o|\n-----",
+    4: "-----\n|o o|\n|   |\n|o o|\n-----",
+    5: "-----\n|o o|\n| o |\n|o o|\n-----",
+    6: "-----\n|o o|\n|o o|\n|o o|\n-----",
 }
 
-print(dice_art[dice])
+# -----------------------------
+# Callback Functions
+# -----------------------------
+def choose_option(option):
+    st.session_state.user_choices.append(option)
+    st.session_state.stage += 1
 
-
-# -----------------------------------
-# User Dice Input (Safe Input)
-# -----------------------------------
-
-while True:
-    try:
-        user_dice = int(input("Enter the dice number (you can lie): "))
-        if 1 <= user_dice <= 6:
-            break
-        else:
-            print("Please enter a number between 1 and 6.")
-    except ValueError:
-        print("Invalid input. Enter a number.")
-
-
-# -----------------------------------
-# Truth or Lie Check (BOLD and Separate)
-# -----------------------------------
-
-print("\n\033[1m===== TRUTH OR LIE CHECK =====\033[0m\n")  # Bold Header
-
-def truth_or_lie_check(real_dice, user_dice):
-    punishment = False
-    if user_dice == real_dice:
-        print("\033[1mYou told the truth. SAFE.\033[0m\n")
+def submit_dice():
+    st.session_state.user_dice = st.session_state.dice_input
+    # Truth or Lie Check
+    if st.session_state.user_dice == st.session_state.dice:
+        st.session_state.truth_message = "✅ You told the truth. SAFE."
     else:
-        print("\033[1mYou lied!\033[0m")
-        if user_dice >= 5:
-            print("\033[1mLie with punishment!\033[0m")
-            punishment = True
+        st.session_state.truth_message = "⚠️ You lied!"
+        if st.session_state.user_dice >= 5:
+            st.session_state.punishment_applied = True
+            st.session_state.punishment_message = "Lie with punishment! (+0.33 to all stages)"
         else:
-            print("\033[1mLie without punishment.\033[0m")
-    return punishment
+            st.session_state.punishment_message = "Lie without punishment."
+    st.session_state.stage += 1
 
-punishment_applied = truth_or_lie_check(dice, user_dice)
+def restart_game():
+    for key in ["stage","user_choices","A_values","B_values","punishment_applied","dice","user_dice"]:
+        st.session_state.pop(key, None)
 
+# -----------------------------
+# Game Stages
+# -----------------------------
+# Stage 1-3: Option A or B
+if st.session_state.stage in [1,2,3]:
+    st.subheader(f"--- Stage {st.session_state.stage} ---")
+    st.write("Choose an option:")
+    col1, col2 = st.columns(2)
+    col1.button("Option A (Safe Zone)", on_click=choose_option, args=("A",))
+    col2.button("Option B (Risk Zone)", on_click=choose_option, args=("B",))
 
-# -----------------------------------
-# Apply Punishment
-# -----------------------------------
+# Stage 4: Dice input
+elif st.session_state.stage == 4:
+    st.subheader("🎲 Dice Roll Stage")
+    st.write(f"The dice has been rolled!")
+    st.text(dice_art[st.session_state.dice])
+    st.session_state.dice_input = st.number_input("Enter the dice number you want to declare (1-6, you may lie)", min_value=1, max_value=6, value=1)
+    st.button("Submit Dice", on_click=submit_dice)
 
-if punishment_applied:
+# Stage 5: Apply Punishment and Show Results
+elif st.session_state.stage == 5:
+    # Apply punishment
+    if st.session_state.punishment_applied:
+        for i in range(3):
+            st.session_state.A_values[i] += PUNISHMENT
+            st.session_state.B_values[i] += PUNISHMENT
+
+    # Show Truth/Lie messages
+    st.write(st.session_state.truth_message)
+    if st.session_state.punishment_applied:
+        st.warning(st.session_state.punishment_message)
+    else:
+        st.info(st.session_state.punishment_message if "punishment_message" in st.session_state else "")
+
+    # Show final values
+    st.subheader("📊 Final Values")
     for i in range(3):
-        A_values[i] += PUNISHMENT
-        B_values[i] += PUNISHMENT
-    print("\n\033[1mPunishment added (+0.33 to all stages)\033[0m\n")
+        st.write(f"Stage {i+1}: Option A = {st.session_state.A_values[i]:.2f}, Option B = {st.session_state.B_values[i]:.2f}")
 
+    # Show winners
+    st.subheader("🏆 Winners by Stage")
+    for i in range(3):
+        if st.session_state.A_values[i] > st.session_state.B_values[i]:
+            winner = "Option A"
+        elif st.session_state.B_values[i] > st.session_state.A_values[i]:
+            winner = "Option B"
+        else:
+            winner = "Draw"
+        st.write(f"Stage {i+1} Winner: {winner}")
 
-# -----------------------------------
-# Show Final Values
-# -----------------------------------
+    # Show user choices
+    st.subheader("🎮 Your Choices")
+    for i, choice in enumerate(st.session_state.user_choices, 1):
+        st.write(f"Stage {i}: Option {choice}")
 
-print("Final Values:")
-
-print("\nOption A:")
-for i in range(3):
-    print(f" Stage {i+1}: {A_values[i]:.2f}")
-
-print("\nOption B:")
-for i in range(3):
-    print(f" Stage {i+1}: {B_values[i]:.2f}")
-
-
-# -----------------------------------
-# Final Result
-# -----------------------------------
-
-print("\n==============================")
-print("        Final Results")
-print("==============================\n")
-
-for i in range(3):
-    print(f"Stage {i+1}:")
-    print(f" Option A: {A_values[i]:.2f}")
-    print(f" Option B: {B_values[i]:.2f}")
-    if A_values[i] > B_values[i]:
-        print(" Winner: Option A")
-    elif B_values[i] > A_values[i]:
-        print(" Winner: Option B")
-    else:
-        print(" Result: Draw")
-    print()
-
-
-# -----------------------------------
-# Show User Choices
-# -----------------------------------
-
-print("Your Choices:")
-for i in range(3):
-    print(f" Stage {i+1}: Option {user_choices[i]}")
-
-print("\nGame Finished. Thank you for playing!")
+    st.success("✅ Game Finished. Thank you for playing!")
+    st.button("🔄 Restart Game", on_click=restart_game)
